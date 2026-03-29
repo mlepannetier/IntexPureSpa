@@ -35,7 +35,7 @@
 *  
 ********************************************************/
 
-#define USED_NETWORK_ID    0xA3C
+#define USED_NETWORK_ID    0xFFFF
 #define USED_CHANNEL       0x22
 
 /*******************************************************
