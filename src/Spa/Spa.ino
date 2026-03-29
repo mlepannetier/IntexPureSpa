@@ -35,16 +35,16 @@
 *  
 ********************************************************/
 
-#define USED_NETWORK_ID    0xFFFF
-#define USED_CHANNEL       0x48
+#define USED_NETWORK_ID    0xA3C
+#define USED_CHANNEL       0x22
 
 /*******************************************************
 *
 *   S E L E C T    Y O U R   S P A   M O D E L 
 *  
 ********************************************************/
-//#define _28458_28462_   // For spa model #28458 #28462 #28457(US) #28461(US)
-//#define _28442_28440_   // For spa Model #28442 #28440
+#define _28458_28462_   // For spa model #28458 #28462 #28457(US) #28461(US)
+//define _28442_28440_   // For spa Model #28442 #28440
 
 #if  defined (_28458_28462_) &&  defined (_28442_28440_)
   #error select only one SPA model
@@ -62,8 +62,8 @@
 #define _MQTT_
 
 #ifdef ESP32
-const char* Myssid = "YourSSID";
-const char* Mypassword = "YourPassword";
+const char* Myssid = "";
+const char* Mypassword = "";
 #endif
 
 
@@ -77,9 +77,9 @@ const char* Mypassword = "YourPassword";
 EspMQTTClient client(
   Myssid,
   Mypassword,
-  "YourMQTT-Broker-IP",  // MQTT Broker server ip
-  "NameMQTTBroker",   // Can be omitted if not needed
-  "PasswordMQTTBroker",   // Can be omitted if not needed
+  "",  // MQTT Broker server ip
+  "",   // Can be omitted if not needed
+  "",   // Can be omitted if not needed
   "IntexSpa",     // Client name that uniquely identify your device
   1883              // The MQTT port, default to 1883. this line can be omitted
 );
@@ -238,8 +238,125 @@ bool SwitchOffSanitizer;
 bool StateSanitizer;
 #endif
 
+// MQTT config
+const char* MQTT_BASE_TOPIC = "IntexSpa";              // topics payload
+const char* MQTT_DISCOVERY_PREFIX = "IntexSpaAuto";    // prefix Home Assistant discovery
+#define IDX_DOMOTICZ_SETPOINT xxx
+
+void publishDiscovery() {
+
+  if (!client.isConnected()) return;
+
+  const char* base = MQTT_BASE_TOPIC;
+  const char* deviceId = "intexspa_001";
+
+  // Device JSON minimal (réutilisé)
+  String deviceJson = String(
+    "\"device\":{"
+      "\"ids\":[\"") + deviceId + "\"]"
+    "}";
+
+  // Helper
+  auto publishEntity = [&](const String& topic, const String& payload) {
+    client.publish(topic.c_str(), payload, true);
+  };
+
+  // Helper discovery topic
+  auto discoveryTopic = [&](const String& component, const String& name) {
+    return String(MQTT_DISCOVERY_PREFIX) + "/" + component + "/" + name + "/config";
+  };
+
+  // =========================
+  // TEMPERATURE
+  // =========================
+  publishEntity(
+    discoveryTopic("sensor", "intexspa_temperature"),
+    String("{\"name\":\"Temp\",\"state_topic\":\"") + base + "/Actual Temperature\",\"unit_of_measurement\":\"°C\",\"device_class\":\"temperature\",\"unique_id\":\"intexspa_temperature\"," + deviceJson + "}"
+  );
+
+  // =========================
+  // SETPOINT TEMP
+  // =========================
+  publishEntity(
+    discoveryTopic("number", "intexspa_temp_setpoint"),
+    String("{\"name\":\"SetTemp\",\"state_topic\":\"") + base + "/Temperature Setpoint\",\"command_topic\":\"" + base + "/Cmd Temperature Setpoint\",\"min\":10,\"max\":40,\"step\":1,\"unit_of_measurement\":\"°C\",\"unique_id\":\"intexspa_temp_setpoint\"," + deviceJson + "}"
+  );
+
+  // =========================
+  // BUBBLE
+  // =========================
+  publishEntity(
+    discoveryTopic("switch", "intexspa_bubble"),
+    String("{\"name\":\"Bubble\",\"state_topic\":\"") + base + "/Bubble on\",\"command_topic\":\"" + base + "/Cmd bubble on off\",\"payload_on\":\"1\",\"payload_off\":\"0\",\"unique_id\":\"intexspa_bubble\"," + deviceJson + "}"
+  );
+
+  // =========================
+  // POWER
+  // =========================
+  publishEntity(
+    discoveryTopic("switch", "intexspa_power"),
+    String("{\"name\":\"Power\",\"state_topic\":\"") + base + "/Power on\",\"command_topic\":\"" + base + "/Cmd Power on off\",\"payload_on\":\"1\",\"payload_off\":\"0\",\"unique_id\":\"intexspa_power\"," + deviceJson + "}"
+  );
+
+  // =========================
+  // HEATER
+  // =========================
+  publishEntity(
+    discoveryTopic("switch", "intexspa_heater"),
+    String("{\"name\":\"Heater\",\"state_topic\":\"") + base + "/heater on\",\"command_topic\":\"" + base + "/Cmd heater on off\",\"payload_on\":\"1\",\"payload_off\":\"0\",\"unique_id\":\"intexspa_heater\"," + deviceJson + "}"
+  );
+
+  // =========================
+  // FILTER
+  // =========================
+  publishEntity(
+    discoveryTopic("switch", "intexspa_filter"),
+    String("{\"name\":\"Filter\",\"state_topic\":\"") + base + "/filter on\",\"command_topic\":\"" + base + "/Cmd water filter on off\",\"payload_on\":\"1\",\"payload_off\":\"0\",\"unique_id\":\"intexspa_filter\"," + deviceJson + "}"
+  );
+
+  // =========================
+  // FILTER TIME
+  // =========================
+  publishEntity(
+    discoveryTopic("number", "intexspa_filter_time"),
+    String("{\"name\":\"FilterTime\",\"state_topic\":\"") + base + "/filter setup time\",\"command_topic\":\"" + base + "/Cmd water filter time\",\"min\":2,\"max\":6,\"step\":2,\"unit_of_measurement\":\"h\",\"unique_id\":\"intexspa_filter_time\"," + deviceJson + "}"
+  );
+
+#ifdef _28458_28462_
+
+  // =========================
+  // SANITIZER
+  // =========================
+  publishEntity(
+    discoveryTopic("switch", "intexspa_sanitizer"),
+    String("{\"name\":\"Sanitizer\",\"state_topic\":\"") + base + "/Sanitizer on\",\"command_topic\":\"" + base + "/Cmd sanitizer on off\",\"payload_on\":\"1\",\"payload_off\":\"0\",\"unique_id\":\"intexspa_sanitizer\"," + deviceJson + "}"
+  );
+
+#endif
+
+  // =========================
+  // ERROR
+  // =========================
+  publishEntity(
+    discoveryTopic("sensor", "intexspa_error"),
+    String("{\"name\":\"Error\",\"state_topic\":\"") + base + "/Error Number\",\"unique_id\":\"intexspa_error\"," + deviceJson + "}"
+  );
+
+  // =========================
+  // CONNECTIVITY
+  // =========================
+  publishEntity(
+    discoveryTopic("binary_sensor", "intexspa_connection"),
+    String("{\"name\":\"Conn\",\"state_topic\":\"") + base + "/Communication with pump\",\"payload_on\":\"1\",\"payload_off\":\"0\",\"device_class\":\"connectivity\",\"unique_id\":\"intexspa_connection\"," + deviceJson + "}"
+  );
+
+  Serial.println("MQTT Discovery published");
+}
+
 //Setup
 void setup() {
+
+  client.setMaxPacketSize(2048);
  
   mySerial.begin(9600);
   Serial.begin(115200);
@@ -589,6 +706,26 @@ void ReadData (unsigned char c)
 #ifdef _MQTT_
 void onConnectionEstablished()
 {
+  publishDiscovery();
+  
+  client.subscribe("domoticz/out", [](const String &payload) {
+
+    Serial.println("Domoticz OUT: " + payload);
+
+    if (payload.indexOf("\"idx\"") == -1) return;
+    if (payload.indexOf(String(IDX_DOMOTICZ_SETPOINT)) == -1) return;
+
+    int pos = payload.indexOf("\"svalue1\" : \"");
+    if (pos == -1) return;
+
+    pos += String("\"svalue1\" : \"").length();
+    int endPos = payload.indexOf("\"", pos);
+    if (endPos == -1) return;
+    String valueStr = payload.substring(pos, endPos);
+    Serial.println("Setpoint Domoticz reçu: " + valueStr);
+    client.publish("IntexSpa/Cmd Temperature Setpoint", valueStr);
+  });
+
    //manage command power on/off
     client.subscribe("IntexSpa/Cmd Power on off", [](const String & payload) {
       if (payload== "1" || payload== "0"){
@@ -775,13 +912,26 @@ void DataManagement (){
    SendValue("IntexSpa/Farenheit Celsius", (bool)(Data[BYTE_STATUS_STATUS] & VALUE_FARENHEIT),ID_FARENHEIT); 
 
    //Send temperature setpoint
-   ActualSetpointTemperarue = Data[BYTE_SETPOINT_TEMPERATURE];
-   SendValue("IntexSpa/Temperature Setpoint", Data[BYTE_SETPOINT_TEMPERATURE],ID_SETPOINT_TEMPERATURE); 
-   if (!ChangeTargetSetpointTemperarue)
-   {
-       TargetSetpointTemperarue =ActualSetpointTemperarue;
-       SendValue("IntexSpa/Cmd Temperature Setpoint", Data[BYTE_SETPOINT_TEMPERATURE],ID_TARGET_TEMPERATURE);   
-   }
+    ActualSetpointTemperarue = Data[BYTE_SETPOINT_TEMPERATURE];
+    SendValue("IntexSpa/Temperature Setpoint", ActualSetpointTemperarue, ID_SETPOINT_TEMPERATURE);
+
+    static uint8_t lastDomoticzSetpoint = 255;
+
+    if (ActualSetpointTemperarue != lastDomoticzSetpoint)
+    {
+        if (client.isConnected())
+        {
+            String payload = "{\"idx\":" + String(IDX_DOMOTICZ_SETPOINT) + ",\"nvalue\":0,\"svalue\":\"" + String(ActualSetpointTemperarue) + "\"}";
+            client.publish("domoticz/in", payload, true);
+        }
+        lastDomoticzSetpoint = ActualSetpointTemperarue;
+    }
+
+    if (!ChangeTargetSetpointTemperarue)
+    {
+        TargetSetpointTemperarue = ActualSetpointTemperarue;
+        SendValue("IntexSpa/Cmd Temperature Setpoint", ActualSetpointTemperarue, ID_TARGET_TEMPERATURE);
+    }
 
    //Send actual temperature
    SendValue("IntexSpa/Actual Temperature", Data[BYTE_ACTUAL_TEMPERATURE],ID_ACTUAL_TEMPERATURE); 
